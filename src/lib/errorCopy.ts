@@ -31,6 +31,10 @@ const errorCopy: Record<string, string> = {
   APPROVAL_STEP_UP_LOCKED: 'Too many attempts — try again later.',
   PAYMENT_PROVIDER_UNAVAILABLE: "PayPal isn't responding. It's safe to try again.",
   AGENT_UNAVAILABLE: "The assistant isn't available right now. Try again in a minute.",
+  CART_VERSION_MISMATCH: 'This cart changed in another tab — reloaded the latest version.',
+  MIXED_MERCHANT_CART: 'A cart can only hold products from one merchant.',
+  CART_LIMIT_EXCEEDED: 'A cart can hold at most 30 items.',
+  PRODUCT_UNAVAILABLE: "That product isn't available right now.",
   INTERNAL_ERROR: 'Something went wrong on our side.',
 };
 

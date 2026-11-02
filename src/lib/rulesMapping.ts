@@ -98,7 +98,7 @@ export function toPolicyDocument(rules: SpendingRules, original: PolicyDocument)
       .filter((b) => b.limit > 0)
       .map((b) => ({ categoryCode: b.categoryCode, period: b.period === 'Weekly' ? 'WEEKLY' : 'MONTHLY', limit: toMoneyString(b.limit) })),
     merchantRules: { ...original.merchantRules, newMerchantAction: ruleActionCode(rules.newMerchants) },
-    productRestrictions: rules.productRestrictions.map((p) => ({
+    productRestrictions: rules.productRestrictions.filter((p) => p.value.trim() !== '').map((p) => ({
       id: p.ruleId,
       match: { type: p.kind === 'Category' ? 'CATEGORY' : p.kind === 'Tag' ? 'TAG' : 'PRODUCT', value: p.value },
       action: ruleActionCode(p.action),

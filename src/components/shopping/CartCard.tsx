@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { ShoppingBasket } from 'lucide-react';
 import { Card } from '../ui/Card';
 import { MerchantAvatar } from '../MerchantAvatar';
@@ -25,7 +26,13 @@ export function CartCard({ cart, merchantStatus }: {cart: Cart;merchantStatus?: 
           </p>
           <p className="text-xs text-muted-foreground">Cart · {cart.items.length} items</p>
         </div>
+        {cart.status === 'OPEN' ?
+        <Link to={`/cart/${cart.id}`} className="text-sm font-medium text-primary-ink hover:underline">
+            Edit cart
+          </Link> :
+
         <ShoppingBasket className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+        }
       </div>
       <ul className="px-4 py-2">
         {lines.map((line) =>

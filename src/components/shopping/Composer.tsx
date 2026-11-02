@@ -4,14 +4,17 @@ import { Button } from '../ui/Button';
 
 export const suggestions = ['Weekly groceries under budget', "What's left this week?", 'Compare milk prices'];
 
-export function Composer({ onSend, disabled }: {onSend: (text: string) => void;disabled?: boolean;}) {
+/** onSend resolves false when the message wasn't delivered, so the text goes back into the box. */
+export function Composer({ onSend, disabled }: {onSend: (text: string) => Promise<boolean> | void;disabled?: boolean;}) {
   const [value, setValue] = useState('');
 
   const send = (text: string) => {
     const trimmed = text.trim();
     if (!trimmed || disabled) return;
-    onSend(trimmed);
     setValue('');
+    void Promise.resolve(onSend(trimmed)).then((delivered) => {
+      if (delivered === false) setValue((current) => current || trimmed);
+    });
   };
 
   return (

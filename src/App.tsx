@@ -17,6 +17,8 @@ import { Merchants } from './pages/Merchants';
 import { Approvals } from './pages/Approvals';
 import { Transactions } from './pages/Transactions';
 import { Settings } from './pages/Settings';
+import { PolicyHistory } from './pages/PolicyHistory';
+import { CartBuilder } from './pages/CartBuilder';
 import { CheckoutReturn } from './pages/CheckoutReturn';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
@@ -79,11 +81,15 @@ export function App() {
                     <Route index element={<Overview />} />
                     <Route path="/shop" element={<AIShopping />} />
                     <Route path="/shop/:conversationId" element={<AIShopping />} />
+                    <Route path="/cart" element={<CartBuilder />} />
+                    <Route path="/cart/:cartId" element={<CartBuilder />} />
                     <Route path="/rules" element={<SpendingRules />} />
+                    <Route path="/rules/history" element={<PolicyHistory />} />
                     <Route path="/merchants" element={<Merchants />} />
                     <Route path="/approvals" element={<Approvals />} />
                     <Route path="/approvals/:id" element={<Approvals />} />
                     <Route path="/transactions" element={<Transactions />} />
+                    <Route path="/transactions/:purchaseId" element={<Transactions />} />
                     <Route path="/settings" element={<Settings />} />
                   </Route>
                 </Route>

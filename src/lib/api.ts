@@ -73,6 +73,7 @@ interface RequestOptions<T> {
   body?: unknown;
   schema?: z.ZodType<T, z.ZodTypeDef, unknown>;
   idempotencyKey?: string;
+  headers?: Record<string, string>;
   query?: Record<string, string | number | boolean | null | undefined>;
   /** Skip the refresh-and-replay dance (auth endpoints). */
   anonymous?: boolean;
@@ -111,6 +112,7 @@ async function send(path: string, options: RequestOptions<unknown>): Promise<Res
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
   if (accessToken && !options.anonymous) headers.Authorization = `Bearer ${accessToken}`;
   if (options.idempotencyKey) headers['Idempotency-Key'] = options.idempotencyKey;
+  Object.assign(headers, options.headers);
   return fetch(buildUrl(path, options.query), {
     method: options.method ?? 'GET',
     headers,

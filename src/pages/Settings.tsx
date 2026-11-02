@@ -5,16 +5,18 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Select } from '../components/ui/Select';
 import { useAuth } from '../contexts/AuthContext';
-import { useDemoReset, useProfile, useUpdateProfile } from '../lib/queries';
+import { useDemoReset, useProfile, useUpdateMe, useUpdateProfile } from '../lib/queries';
 import { errorMessage } from '../lib/errorCopy';
 
 const commonTimeZones = ['America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'Europe/London', 'Europe/Berlin', 'Africa/Lagos', 'Asia/Singapore', 'Australia/Sydney', 'UTC'];
 const APP_VERSION = `${__APP_VERSION__} (${__BUILD_DATE__})`;
 
 export function Settings() {
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const profile = useProfile();
   const updateProfile = useUpdateProfile();
+  const updateMe = useUpdateMe();
+  const [name, setName] = useState('');
   const demoReset = useDemoReset();
   const [tz, setTz] = useState<string>('');
   const [confirmLogout, setConfirmLogout] = useState(false);
@@ -23,6 +25,28 @@ export function Settings() {
   useEffect(() => {
     if (profile.data) setTz(profile.data.timeZone);
   }, [profile.data]);
+
+  useEffect(() => {
+    if (user) setName(user.displayName);
+  }, [user]);
+
+  const nameChanged = !!user && name.trim() !== user.displayName;
+  const tzChanged = !!profile.data && tz !== profile.data.timeZone;
+  const saving = updateProfile.isPending || updateMe.isPending;
+
+  const saveProfile = async () => {
+    if (!name.trim()) {
+      toast.error('Display name can’t be empty');
+      return;
+    }
+    try {
+      if (nameChanged) updateUser(await updateMe.mutateAsync(name.trim()));
+      if (tzChanged) await updateProfile.mutateAsync(tz);
+      toast.success('Profile saved');
+    } catch (err) {
+      toast.error(errorMessage(err));
+    }
+  };
 
   const timeZones = tz && !commonTimeZones.includes(tz) ? [tz, ...commonTimeZones] : commonTimeZones;
 
@@ -38,28 +62,27 @@ export function Settings() {
             className="space-y-4"
             onSubmit={(e) => {
               e.preventDefault();
-              updateProfile.mutate(tz, {
-                onSuccess: () => toast.success('Profile saved'),
-                onError: (err) => toast.error(errorMessage(err))
-              });
+              void saveProfile();
             }}>
             
             <div>
               <label htmlFor="display-name" className="mb-1.5 block text-sm font-medium">Display name</label>
               <input
                 id="display-name"
-                value={user?.displayName ?? ''}
-                readOnly
+                value={name}
+                maxLength={60}
+                autoComplete="nickname"
+                onChange={(e) => setName(e.target.value)}
                 aria-describedby="display-name-hint"
-                className="h-10 w-full rounded-btn border border-border bg-muted/50 px-3 text-sm text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" />
+                className="h-10 w-full rounded-btn border border-border bg-card px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" />
               <p id="display-name-hint" className="mt-1.5 text-xs text-muted-foreground">{user?.email}</p>
             </div>
             <div>
               <label htmlFor="tz" className="mb-1.5 block text-sm font-medium">Time zone</label>
               <Select id="tz" options={timeZones} value={tz} onChange={(e) => setTz(e.target.value)} className="w-full" disabled={!profile.data} />
             </div>
-            <Button type="submit" disabled={!profile.data || tz === profile.data.timeZone || updateProfile.isPending}>
-              {updateProfile.isPending && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+            <Button type="submit" disabled={(!nameChanged && !tzChanged) || saving}>
+              {saving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
               Save profile
             </Button>
           </form>

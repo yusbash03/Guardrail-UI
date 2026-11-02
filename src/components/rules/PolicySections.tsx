@@ -1,20 +1,66 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Ban, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, Ban, CheckCircle2, Plus, Trash2 } from 'lucide-react';
+import { Button } from '../ui/Button';
 import { RuleSection, RuleSectionsProps } from './RuleSection';
 import { SegmentedTabs } from '../ui/SegmentedTabs';
 import { Select } from '../ui/Select';
 import { Switch } from '../ui/Switch';
 import { StatusChip } from '../StatusChip';
 import { ruleActions } from '../../data/rules';
-import type { RuleAction } from '../../types/rules';
+import type { ProductRestriction, RuleAction, TimeRestriction } from '../../types/rules';
 import { scopeLabels, windowOptions } from '../../lib/rulesMapping';
 
 function ActionText({ action }: {action: RuleAction;}) {
   return <span className={action === 'Block' ? 'font-semibold text-blocked-fg' : 'font-semibold text-foreground'}>{action}</span>;
 }
 
-export function PolicySections({ rules, update, isEditing, toggleEdit }: RuleSectionsProps) {
+const restrictionKinds = ['Category', 'Tag', 'Product'] as const;
+
+const dayPresets: Record<string, string[]> = {
+  'Every day': ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'],
+  Weekdays: ['MON', 'TUE', 'WED', 'THU', 'FRI'],
+  Weekends: ['SAT', 'SUN']
+};
+const dayOptionsFor = (current: string) => (dayPresets[current] ? Object.keys(dayPresets) : [current, ...Object.keys(dayPresets)]);
+
+function RemoveButton({ label, onClick }: {label: string;onClick: () => void;}) {
+  return (
+    <button type="button" aria-label={label} onClick={onClick} className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-blocked-fg">
+      <Trash2 className="h-4 w-4" aria-hidden="true" />
+    </button>);
+
+}
+
+export function PolicySections({ rules, update, isEditing, toggleEdit, categories }: RuleSectionsProps) {
+  const setRestriction = (id: string, patch: Partial<ProductRestriction>) =>
+  update({ productRestrictions: rules.productRestrictions.map((x) => x.id === id ? { ...x, ...patch } : x) });
+  const setTime = (id: string, patch: Partial<TimeRestriction>) =>
+  update({ timeRestrictions: rules.timeRestrictions.map((x) => x.id === id ? { ...x, ...patch } : x) });
+
+  const addRestriction = () => {
+    const taken = new Set(rules.productRestrictions.filter((p) => p.kind === 'Category').map((p) => p.value));
+    const free = categories.filter((c) => !taken.has(c.code));
+    const category = free.find((c) => c.code === 'ALCOHOL') ?? free[0] ?? categories[0];
+    update({
+      productRestrictions: [
+      ...rules.productRestrictions,
+      { id: `p${Date.now()}`, ruleId: null, kind: 'Category', value: category?.code ?? '', label: category?.name ?? '', action: 'Block', note: null }]
+
+    });
+    if (!isEditing('products')) toggleEdit('products');
+  };
+
+  const addQuietHours = () => {
+    update({
+      timeRestrictions: [
+      ...rules.timeRestrictions,
+      { id: `t${Date.now()}`, ruleId: null, daysOfWeek: dayPresets['Every day'], days: 'Every day', start: '23:00', end: '06:00', action: 'Block' }]
+
+    });
+    if (!isEditing('time')) toggleEdit('time');
+  };
+
   return (
     <>
       <RuleSection id="merchants" title="Merchants" description="Where your assistant is allowed to shop." editing={isEditing('merchants')} onToggleEdit={() => toggleEdit('merchants')}>
@@ -57,27 +103,66 @@ export function PolicySections({ rules, update, isEditing, toggleEdit }: RuleSec
         {rules.productRestrictions.length === 0 && <p className="text-sm text-muted-foreground">No product restrictions.</p>}
         <ul className="divide-y divide-border">
           {rules.productRestrictions.map((p) =>
-          <li key={p.id} className="flex items-center justify-between gap-3 py-2.5 text-sm first:pt-0 last:pb-0">
-              <span>
-                <span className="text-muted-foreground">{p.kind}:</span> <span className="font-medium">{p.label}</span>
-              </span>
+          <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5 text-sm first:pt-0 last:pb-0">
               {isEditing('products') ?
-            <Select
-              aria-label={`Action for ${p.label}`}
-              options={ruleActions}
-              value={p.action}
-              onChange={(e) =>
-              update({ productRestrictions: rules.productRestrictions.map((x) => x.id === p.id ? { ...x, action: e.target.value as RuleAction } : x) })
-              } /> :
+            <>
+                  <span className="flex flex-wrap items-center gap-2">
+                    <Select
+                  aria-label="Restriction type"
+                  options={restrictionKinds}
+                  value={p.kind}
+                  onChange={(e) => {
+                    const kind = e.target.value as ProductRestriction['kind'];
+                    const first = categories[0];
+                    setRestriction(p.id, kind === 'Category' && first ? { kind, value: first.code, label: first.name } : { kind, value: '', label: '' });
+                  }} />
+                
+                    {p.kind === 'Category' ?
+                <Select
+                  aria-label="Category"
+                  options={categories.map((c) => c.name)}
+                  value={p.label}
+                  onChange={(e) => {
+                    const category = categories.find((c) => c.name === e.target.value);
+                    if (category) setRestriction(p.id, { value: category.code, label: category.name });
+                  }} /> :
 
 
-            <span>
-                  → <ActionText action={p.action} />
-                </span>
+                <input
+                  aria-label={p.kind === 'Tag' ? 'Tag' : 'Product ID'}
+                  placeholder={p.kind === 'Tag' ? 'e.g. gift-card' : 'Product ID'}
+                  value={p.value}
+                  onChange={(e) => setRestriction(p.id, { value: e.target.value.trim(), label: e.target.value.trim() })}
+                  className="h-9 w-40 rounded-btn border border-border bg-card px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" />
+
+                }
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Select
+                  aria-label={`Action for ${p.label || 'restriction'}`}
+                  options={ruleActions}
+                  value={p.action}
+                  onChange={(e) => setRestriction(p.id, { action: e.target.value as RuleAction })} />
+                
+                    <RemoveButton label={`Remove ${p.label || 'restriction'}`} onClick={() => update({ productRestrictions: rules.productRestrictions.filter((x) => x.id !== p.id) })} />
+                  </span>
+                </> :
+
+            <>
+                  <span>
+                    <span className="text-muted-foreground">{p.kind}:</span> <span className="font-medium">{p.label}</span>
+                  </span>
+                  <span>
+                    → <ActionText action={p.action} />
+                  </span>
+                </>
             }
             </li>
           )}
         </ul>
+        <Button variant="ghost" size="sm" className="mt-3 -ml-2 text-primary-ink" onClick={addRestriction}>
+          <Plus className="h-4 w-4" aria-hidden="true" /> Add restriction
+        </Button>
       </RuleSection>
 
       <RuleSection id="duplicates" title="Duplicate protection" description="Stops the same item being bought twice by accident." editing={isEditing('duplicates')} onToggleEdit={() => toggleEdit('duplicates')}>
@@ -104,43 +189,52 @@ export function PolicySections({ rules, update, isEditing, toggleEdit }: RuleSec
 
       <RuleSection id="time" title="Time restrictions" description="Quiet hours when nothing gets bought." editing={isEditing('time')} onToggleEdit={() => toggleEdit('time')}>
         {rules.timeRestrictions.length === 0 && <p className="text-sm text-muted-foreground">No quiet hours set.</p>}
-        {rules.timeRestrictions.map((t) =>
-        <div key={t.id} className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="font-medium">{t.days}</span>
-            {isEditing('time') ?
-          <>
-                <input
-              type="time"
-              aria-label="Start time"
-              value={t.start}
-              onChange={(e) => update({ timeRestrictions: rules.timeRestrictions.map((x) => x.id === t.id ? { ...x, start: e.target.value } : x) })}
-              className="tabular h-9 rounded-btn border border-border bg-card px-2 text-sm" />
-            
-                –
-                <input
-              type="time"
-              aria-label="End time"
-              value={t.end}
-              onChange={(e) => update({ timeRestrictions: rules.timeRestrictions.map((x) => x.id === t.id ? { ...x, end: e.target.value } : x) })}
-              className="tabular h-9 rounded-btn border border-border bg-card px-2 text-sm" />
-            
-                <Select
-              aria-label="Action"
-              options={ruleActions}
-              value={t.action}
-              onChange={(e) => update({ timeRestrictions: rules.timeRestrictions.map((x) => x.id === t.id ? { ...x, action: e.target.value as RuleAction } : x) })} />
-            
-              </> :
+        <div className="space-y-3">
+          {rules.timeRestrictions.map((t) =>
+          <div key={t.id} className="flex flex-wrap items-center gap-2 text-sm">
+              {isEditing('time') ?
+            <>
+                  <Select
+                aria-label="Days"
+                options={dayOptionsFor(t.days)}
+                value={t.days}
+                onChange={(e) => setTime(t.id, { days: e.target.value, daysOfWeek: dayPresets[e.target.value] ?? t.daysOfWeek })} />
+              
+                  <input
+                type="time"
+                aria-label="Start time"
+                value={t.start}
+                onChange={(e) => setTime(t.id, { start: e.target.value })}
+                className="tabular h-9 rounded-btn border border-border bg-card px-2 text-sm" />
+              
+                  –
+                  <input
+                type="time"
+                aria-label="End time"
+                value={t.end}
+                onChange={(e) => setTime(t.id, { end: e.target.value })}
+                className="tabular h-9 rounded-btn border border-border bg-card px-2 text-sm" />
+              
+                  <Select aria-label="Action" options={ruleActions} value={t.action} onChange={(e) => setTime(t.id, { action: e.target.value as RuleAction })} />
+                  <RemoveButton label={`Remove ${t.days} ${t.start}–${t.end}`} onClick={() => update({ timeRestrictions: rules.timeRestrictions.filter((x) => x.id !== t.id) })} />
+                </> :
 
-          <span>
-                <span className="tabular">
-                  {t.start}–{t.end}
-                </span>{' '}
-                → <ActionText action={t.action} />
-              </span>
-          }
-          </div>
-        )}
+            <>
+                  <span className="font-medium">{t.days}</span>
+                  <span>
+                    <span className="tabular">
+                      {t.start}–{t.end}
+                    </span>{' '}
+                    → <ActionText action={t.action} />
+                  </span>
+                </>
+            }
+            </div>
+          )}
+        </div>
+        <Button variant="ghost" size="sm" className="mt-3 -ml-2 text-primary-ink" onClick={addQuietHours}>
+          <Plus className="h-4 w-4" aria-hidden="true" /> Add quiet hours
+        </Button>
       </RuleSection>
 
       <RuleSection id="unbudgeted" title="Unbudgeted categories" description="What happens when an item has no budget yet." editing={isEditing('unbudgeted')} onToggleEdit={() => toggleEdit('unbudgeted')}>

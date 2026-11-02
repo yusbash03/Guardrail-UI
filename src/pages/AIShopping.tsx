@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
-import { ConversationList } from '../components/shopping/ConversationList';
+import { ConversationList, ConversationSheet, ConversationSheetButton } from '../components/shopping/ConversationList';
 import { BudgetRail, MobileBudgetStrip } from '../components/shopping/BudgetRail';
 import { AssistantMessage, TypingIndicator, UserMessage } from '../components/shopping/ChatMessage';
 import { AgentCards } from '../components/shopping/AgentCards';
@@ -13,7 +13,7 @@ import { StepUpDialog } from '../components/StepUpDialog';
 import { useStartCheckout } from '../hooks/useStartCheckout';
 import { useOnline } from '../hooks/useOnline';
 import { useConversations, useCreateConversation, useMessages, useReject, useSendMessage, queryKeys } from '../lib/queries';
-import { api } from '../lib/api';
+import { api, isApiError } from '../lib/api';
 import { errorMessage } from '../lib/errorCopy';
 import { AgentTurnSchema, type AgentMessage, type ApprovalDto, type PurchaseDto, type ToolCall } from '../lib/schemas';
 import { toolLabel } from '../utils/labels';
@@ -85,6 +85,7 @@ export function AIShopping() {
   const [pendingText, setPendingText] = useState<string | null>(null);
   const [toolCalls, setToolCalls] = useState<Record<string, ToolCall[]>>({});
   const [stepUp, setStepUp] = useState<ApprovalDto | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // /shop opens the most recent conversation, if there is one.
@@ -110,7 +111,7 @@ export function AIShopping() {
     if (turn.toolCalls.length) setToolCalls((t) => ({ ...t, [turn.assistantMessage.id]: turn.toolCalls }));
   };
 
-  const send = async (text: string) => {
+  const send = async (text: string): Promise<boolean> => {
     setPendingText(text);
     try {
       if (conversationId) {
@@ -123,8 +124,12 @@ export function AIShopping() {
         void queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
         navigate(`/shop/${conversation.id}`);
       }
+      return true;
     } catch (err) {
-      toast.error(errorMessage(err));
+      toast.error(errorMessage(err), isApiError(err, 'AGENT_UNAVAILABLE') ?
+      { action: { label: 'Build a cart yourself', onClick: () => navigate('/cart') } } :
+      undefined);
+      return false;
     } finally {
       setPendingText(null);
     }
@@ -169,6 +174,10 @@ export function AIShopping() {
         creating={createConversation.isPending && !typing} />
 
       <section aria-label="Chat" className="flex min-w-0 flex-1 flex-col">
+        <ConversationSheetButton
+          title={conversations.data?.find((c) => c.id === conversationId)?.title ?? 'New chat'}
+          onOpen={() => setSheetOpen(true)} />
+        
         <MobileBudgetStrip />
         <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto max-w-3xl space-y-6 px-4 py-6 lg:px-6" aria-live="polite">
@@ -219,9 +228,18 @@ export function AIShopping() {
             {typing && <TypingIndicator />}
           </div>
         </div>
-        <Composer onSend={(text) => void send(text)} disabled={typing || !online} />
+        <Composer onSend={send} disabled={typing || !online} />
       </section>
       <BudgetRail />
+      <ConversationSheet
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        conversations={conversations.data ?? []}
+        activeId={conversationId}
+        onSelect={(id) => navigate(`/shop/${id}`)}
+        onNew={newChat}
+        creating={createConversation.isPending && !typing} />
+      
       <StepUpDialog approval={stepUp} onClose={() => setStepUp(null)} onConfirmed={handleConfirmed} />
     </div>);
 

@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Check, Download, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Select } from '../components/ui/Select';
 import { SegmentedTabs } from '../components/ui/SegmentedTabs';
-import { DataGrid, Column } from '../components/DataGrid';
+import { DataGrid, Column, SortState } from '../components/DataGrid';
 import { MerchantAvatar } from '../components/MerchantAvatar';
 import { MoneyText } from '../components/MoneyText';
 import { StatusChip } from '../components/StatusChip';
@@ -14,7 +15,7 @@ import { PageError } from '../components/PageState';
 import { TransactionPanel } from '../components/transactions/TransactionPanel';
 import { useCategories, useLedgerEntries, usePurchase, useTransactions } from '../lib/queries';
 import { buildTimeline } from '../lib/timeline';
-import type { LedgerEntryDto, TransactionDto } from '../lib/schemas';
+import type { LedgerEntryDto, PurchaseDto, TransactionDto } from '../lib/schemas';
 import { downloadCsv } from '../utils/csv';
 import { merchantAvatar } from '../utils/merchant';
 import { categoryName, humanize, isCancellable, paymentStatusLabel, purchaseStatusLabel } from '../utils/labels';
@@ -65,8 +66,28 @@ function toRow(t: TransactionDto): Purchase {
   };
 }
 
+/** Row for a deep-linked purchase that isn't on the current page. */
+function rowFromPurchase(p: PurchaseDto): Purchase {
+  return {
+    id: p.id,
+    date: formatDate(p.createdAt),
+    dateTime: formatDateTime(p.createdAt),
+    merchant: p.merchantName,
+    ...merchantAvatar(p.merchantName),
+    amount: toAmount(p.amount),
+    purchaseStatus: purchaseStatusLabel(p.status),
+    paymentStatus: paymentStatusLabel(p.payment?.status),
+    orderId: p.payment?.paypalOrderId ?? null,
+    authorizationId: p.payment?.paypalAuthorizationId ?? null,
+    captureId: p.payment?.paypalCaptureId ?? null,
+    finalCheck: p.payment?.finalCheck ? p.payment.finalCheck.passed : null,
+    canCancel: isCancellable(p.status),
+    timeline: []
+  };
+}
+
 const purchaseColumns: Column<Purchase>[] = [
-{ key: 'date', header: 'Date', render: (r) => <span className="text-muted-foreground">{r.date}</span> },
+{ key: 'date', header: 'Date', sortField: 'createdAt', render: (r) => <span className="text-muted-foreground">{r.date}</span> },
 {
   key: 'merchant',
   header: 'Merchant',
@@ -76,8 +97,8 @@ const purchaseColumns: Column<Purchase>[] = [
       </span>
 
 },
-{ key: 'amount', header: 'Amount', align: 'right', render: (r) => <MoneyText amount={r.amount} /> },
-{ key: 'ps', header: 'Purchase status', render: (r) => <StatusChip label={r.purchaseStatus} /> },
+{ key: 'amount', header: 'Amount', align: 'right', sortField: 'amount', render: (r) => <MoneyText amount={r.amount} /> },
+{ key: 'ps', header: 'Purchase status', sortField: 'status', render: (r) => <StatusChip label={r.purchaseStatus} /> },
 { key: 'pay', header: 'Payment status', render: (r) => r.paymentStatus === '—' ? <span className="text-muted-foreground">—</span> : <StatusChip label={r.paymentStatus} /> },
 { key: 'order', header: 'PayPal order ID', render: (r) => r.orderId ? <CopyId value={r.orderId} label="PayPal order ID" /> : <span className="text-muted-foreground">—</span> },
 { key: 'auth', header: 'Authorization ID', render: (r) => <span className="font-mono text-xs text-muted-foreground">{r.authorizationId ?? '—'}</span> },
@@ -126,14 +147,15 @@ function Pager({ page, total, onChange }: {page: number;total: number;onChange: 
 
 }
 
-/** Detail panel: PurchaseDto + its ledger entries → status timeline. */
-function useSelectedPurchase(row: Purchase | null): Purchase | null {
-  const purchase = usePurchase(row?.id);
-  const entries = useLedgerEntries({ purchaseId: row?.id }, !!row);
+/** Detail panel: PurchaseDto + its ledger entries → status timeline. Works for deep links too. */
+function useSelectedPurchase(id: string | undefined, listRow: Purchase | undefined): Purchase | null {
+  const purchase = usePurchase(id);
+  const entries = useLedgerEntries({ purchaseId: id }, !!id);
   return useMemo(() => {
-    if (!row) return null;
-    if (!purchase.data) return row;
+    if (!id) return null;
     const p = purchase.data;
+    const row = listRow ?? (p ? rowFromPurchase(p) : null);
+    if (!row || !p) return row;
     return {
       ...row,
       authorizationId: p.payment?.paypalAuthorizationId ?? row.authorizationId,
@@ -145,16 +167,18 @@ function useSelectedPurchase(row: Purchase | null): Purchase | null {
       canCancel: isCancellable(p.status),
       timeline: buildTimeline(p, entries.data?.items ?? [])
     };
-  }, [row, purchase.data, entries.data]);
+  }, [id, listRow, purchase.data, entries.data]);
 }
 
 export function Transactions() {
+  const { purchaseId } = useParams();
+  const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('purchases');
+  const [sort, setSort] = useState<SortState>({ field: 'createdAt', direction: 'desc' });
   const [status, setStatus] = useState<(typeof statusOptions)[number]>('All statuses');
   const [range, setRange] = useState<(typeof rangeOptions)[number]>('Last 30 days');
   const [page, setPage] = useState(1);
   const [ledgerPage, setLedgerPage] = useState(1);
-  const [selected, setSelected] = useState<Purchase | null>(null);
   const categories = useCategories();
 
   const from = useMemo(() => {
@@ -162,11 +186,12 @@ export function Transactions() {
     return days === null ? undefined : new Date(Date.now() - days * 86_400_000).toISOString();
   }, [range]);
 
-  const transactions = useTransactions({ status: statusCodes[status], from, page, pageSize: PAGE_SIZE });
+  const transactions = useTransactions({ status: statusCodes[status], from, sort: `${sort.field}:${sort.direction}`, page, pageSize: PAGE_SIZE });
   const ledger = useLedgerEntries({ from, page: ledgerPage, pageSize: PAGE_SIZE }, tab === 'ledger');
-  const detail = useSelectedPurchase(selected);
 
   const rows = (transactions.data?.items ?? []).map(toRow);
+  const detail = useSelectedPurchase(purchaseId, rows.find((r) => r.id === purchaseId));
+  const open = (row: Purchase) => navigate(`/transactions/${row.id}`);
   const ledgerRows: LedgerEntry[] = (ledger.data?.items ?? []).map((e: LedgerEntryDto) => ({
     id: e.id,
     time: formatDateTime(e.occurredAt),
@@ -246,15 +271,20 @@ export function Transactions() {
             columns={purchaseColumns}
             rows={rows}
             getRowId={(r) => r.id}
-            onRowClick={setSelected}
-            selectedId={selected?.id}
+            onRowClick={open}
+            selectedId={purchaseId}
+            sort={sort}
+            onSortChange={(next) => {
+              setSort(next);
+              setPage(1);
+            }}
             emptyLabel={transactions.isLoading ? 'Loading…' : 'No purchases match this filter.'} />
           
           </div>
           <ul className="space-y-3 md:hidden">
             {rows.map((r) =>
           <li key={r.id}>
-                <button type="button" onClick={() => setSelected(r)} className="w-full text-left">
+                <button type="button" onClick={() => open(r)} className="w-full text-left">
                   <Card className="flex items-center gap-3 p-4">
                     <MerchantAvatar initials={r.initials} hue={r.hue} />
                     <div className="min-w-0 flex-1">
@@ -298,7 +328,7 @@ export function Transactions() {
         </>
       }
       <p className="mt-3 text-xs text-muted-foreground">PayPal IDs are from the PayPal Sandbox.</p>
-      <TransactionPanel purchase={detail} onClose={() => setSelected(null)} />
+      <TransactionPanel purchase={detail} onClose={() => navigate('/transactions')} />
     </div>);
 
 }

@@ -36,5 +36,7 @@ export const pageTitles: Record<string, string> = {
   '/merchants': 'Merchants',
   '/approvals': 'Purchase Approvals',
   '/transactions': 'Transactions',
-  '/settings': 'Settings'
+  '/settings': 'Settings',
+  '/cart': 'Build a cart',
+  '/rules/history': 'Rule history'
 };

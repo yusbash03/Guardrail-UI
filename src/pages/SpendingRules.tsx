@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AlertTriangle, History, Loader2, RotateCw } from 'lucide-react';
 import { toast } from 'sonner';
@@ -140,6 +141,9 @@ export function SpendingRules() {
                   </li>
               )}
                 {versions.isLoading && <li className="px-2.5 py-2 text-sm">Loading…</li>}
+                <li className="border-t border-border px-2.5 pb-1 pt-2">
+                  <Link to="/rules/history" className="text-sm font-medium text-primary-ink hover:underline">Compare versions →</Link>
+                </li>
               </motion.ul>
             }
           </AnimatePresence>

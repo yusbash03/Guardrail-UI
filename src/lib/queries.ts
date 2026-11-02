@@ -6,6 +6,7 @@ import {
   AgentTurnSchema,
   ApprovalDecisionSchema,
   ApprovalSchema,
+  CartSchema,
   CategorySchema,
   CheckoutResponseSchema,
   ConversationSchema,
@@ -14,12 +15,16 @@ import {
   LedgerSummarySchema,
   MerchantChangeSchema,
   MerchantSchema,
+  PolicyDecisionSchema,
   PolicyDocumentSchema,
   PolicyVersionSummarySchema,
+  ProductSchema,
   PurchaseSchema,
   SpendingProfileSchema,
   TransactionSchema,
+  UserSchema,
   paged,
+  type Cart,
   type PolicyDocument,
 } from './schemas';
 import { useAuth } from '../contexts/AuthContext';
@@ -39,6 +44,9 @@ export const queryKeys = {
   ledgerSummary: (period: string) => ['ledger', 'summary', period] as const,
   conversations: ['conversations'] as const,
   messages: (id: string) => ['conversation', id, 'messages'] as const,
+  policyVersion: (n: number) => ['policies', 'versions', n] as const,
+  products: (filters: object) => ['products', filters] as const,
+  cart: (id: string) => ['cart', id] as const,
 };
 
 /** FRONTEND_SPECIFICATION.md §4: after approve/reject/checkout/capture, money views must refetch. */
@@ -132,6 +140,8 @@ export function usePurchase(id: string | null | undefined, options: { poll?: boo
 export interface TransactionFilters {
   status?: string;
   from?: string;
+  /** Server-side sort `field:asc|desc` over createdAt, amount, status, completedAt. */
+  sort: string;
   page: number;
   pageSize: number;
 }
@@ -139,10 +149,32 @@ export interface TransactionFilters {
 export function useTransactions(filters: TransactionFilters) {
   return useQuery({
     queryKey: queryKeys.transactions(filters),
-    queryFn: () => api('/transactions', { query: { ...filters, sort: '-createdAt' }, schema: paged(TransactionSchema) }),
+    queryFn: () => api('/transactions', { query: { ...filters }, schema: paged(TransactionSchema) }),
     enabled: useAuthed(),
     placeholderData: (previous) => previous,
   });
+}
+
+export function usePolicyVersion(versionNumber: number | null) {
+  return useQuery({
+    queryKey: queryKeys.policyVersion(versionNumber ?? 0),
+    queryFn: () => api(`/policies/versions/${versionNumber}`, { schema: PolicyDocumentSchema }),
+    enabled: useAuthed() && versionNumber !== null,
+    staleTime: Infinity, // versions are immutable
+  });
+}
+
+export function useProducts(filters: { merchantId?: string; query?: string }) {
+  return useQuery({
+    queryKey: queryKeys.products(filters),
+    queryFn: () => api('/products', { query: { ...filters, pageSize: 50 }, schema: paged(ProductSchema) }),
+    enabled: useAuthed() && !!filters.merchantId,
+    placeholderData: (previous) => previous,
+  });
+}
+
+export function useCart(id: string | undefined) {
+  return useQuery({ queryKey: queryKeys.cart(id ?? ''), queryFn: () => api(`/carts/${id}`, { schema: CartSchema }), enabled: useAuthed() && !!id });
 }
 
 export function useLedgerEntries(filters: { purchaseId?: string; from?: string; page?: number; pageSize?: number }, enabled = true) {
@@ -266,6 +298,52 @@ export function useSendMessage(conversationId: string | undefined) {
       void client.invalidateQueries({ queryKey: ['approvals'] });
       void client.invalidateQueries({ queryKey: ['ledger'] });
     },
+  });
+}
+
+// ------------------------------------------------------------------ carts (manual cart / edit cart)
+
+/** Cart writes send If-Match: "<version>" so a stale editor gets 412 CART_VERSION_MISMATCH instead of clobbering. */
+export function useCartMutations() {
+  const client = useQueryClient();
+  const store = (cart: Cart) => {
+    client.setQueryData(queryKeys.cart(cart.id), cart);
+    void client.invalidateQueries({ queryKey: ['conversation'] });
+    return cart;
+  };
+  const ifMatch = (version: number) => ({ 'If-Match': `"${version}"` });
+  return {
+    create: useMutation({
+      mutationFn: (input: { merchantId: string; items: Array<{ productId: string; quantity: number }> }) =>
+        api('/carts', { method: 'POST', body: input, schema: CartSchema }).then(store),
+    }),
+    add: useMutation({
+      mutationFn: ({ cart, productId, quantity }: { cart: Cart; productId: string; quantity: number }) =>
+        api(`/carts/${cart.id}/items`, { method: 'POST', body: { productId, quantity }, headers: ifMatch(cart.version), schema: CartSchema }).then(store),
+    }),
+    setQuantity: useMutation({
+      mutationFn: ({ cart, productId, quantity }: { cart: Cart; productId: string; quantity: number }) =>
+        api(`/carts/${cart.id}/items/${productId}`, { method: 'PATCH', body: { quantity }, headers: ifMatch(cart.version), schema: CartSchema }).then(store),
+    }),
+    remove: useMutation({
+      mutationFn: ({ cart, productId }: { cart: Cart; productId: string }) =>
+        api(`/carts/${cart.id}/items/${productId}`, { method: 'DELETE', headers: ifMatch(cart.version), schema: CartSchema }).then(store),
+    }),
+    evaluate: useMutation({
+      mutationFn: (cartId: string) => api(`/carts/${cartId}/evaluate`, { method: 'POST', schema: PolicyDecisionSchema }),
+    }),
+    purchase: useMutation({
+      mutationFn: ({ cartId, evaluationId, idempotencyKey }: { cartId: string; evaluationId: string; idempotencyKey: string }) =>
+        api('/purchases', { method: 'POST', body: { cartId, evaluationId }, idempotencyKey, schema: PurchaseSchema }),
+      onSuccess: () => invalidateMoney(client),
+    }),
+  };
+}
+
+/** Assumed endpoint: PATCH /me { displayName } → UserDto. */
+export function useUpdateMe() {
+  return useMutation({
+    mutationFn: (displayName: string) => api('/me', { method: 'PATCH', body: { displayName }, schema: UserSchema }),
   });
 }
 
