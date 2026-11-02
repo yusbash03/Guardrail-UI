@@ -1,0 +1,95 @@
+/* @import url() FONT IMPORTS MUST ALWAYS BE AT THE VERY TOP OF THIS FILE, ABOVE THE TAILWIND IMPORTS — DO NOT DELETE THIS COMMENT */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* CRITICAL: THE FOLLOWING TAILWIND IMPORTS MUST NEVER BE DELETED OR REORDERED — DO NOT DELETE THIS COMMENT */
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+/* END TAILWIND IMPORTS — ALL OTHER CSS MUST GO BELOW THIS LINE */
+
+:root,
+.light {
+  --background: 220 20% 98%;
+  --foreground: 222 30% 12%;
+  --card: 0 0% 100%;
+  --muted: 220 16% 95%;
+  --muted-foreground: 220 10% 42%;
+  --border: 220 15% 90%;
+  --track: 220 16% 93%;
+  --primary: 243 75% 58%;
+  --primary-foreground: 0 0% 100%;
+  --primary-ink: 243 70% 52%;
+  --accent: 168 70% 38%;
+  --accent-fg: 168 75% 26%;
+  --allowed: 152 60% 36%;
+  --allowed-fg: 152 65% 27%;
+  --approval: 38 92% 45%;
+  --approval-fg: 30 90% 30%;
+  --blocked: 0 72% 50%;
+  --blocked-fg: 0 72% 42%;
+  --danger: 0 72% 44%;
+  --pending: 220 14% 70%;
+  --avatar-fg-l: 30%;
+  color-scheme: light;
+}
+.dark {
+  --background: 222 30% 7%;
+  --foreground: 210 20% 96%;
+  --card: 222 25% 10%;
+  --muted: 222 20% 14%;
+  --muted-foreground: 220 12% 68%;
+  --border: 222 18% 19%;
+  --track: 222 20% 17%;
+  --primary: 243 75% 60%;
+  --primary-foreground: 0 0% 100%;
+  --primary-ink: 243 90% 78%;
+  --accent: 168 60% 45%;
+  --accent-fg: 168 65% 60%;
+  --allowed: 152 55% 45%;
+  --allowed-fg: 152 60% 62%;
+  --approval: 38 92% 50%;
+  --approval-fg: 38 95% 64%;
+  --blocked: 0 72% 56%;
+  --blocked-fg: 0 85% 72%;
+  --danger: 0 72% 46%;
+  --pending: 220 10% 46%;
+  --avatar-fg-l: 78%;
+  color-scheme: dark;
+}
+* {
+  border-color: hsl(var(--border));
+}
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  -webkit-font-smoothing: antialiased;
+}
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+.bar-pending {
+  background-color: hsl(var(--pending) / 0.3);
+  background-image: repeating-linear-gradient(135deg, hsl(var(--pending)) 0 3px, transparent 3px 7px);
+}
+.bar-over {
+  background-color: hsl(var(--blocked) / 0.2);
+  background-image: repeating-linear-gradient(135deg, hsl(var(--blocked)) 0 3px, transparent 3px 7px);
+}
+input[type='range'] {
+  accent-color: hsl(var(--primary));
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
