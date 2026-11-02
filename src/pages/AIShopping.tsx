@@ -39,9 +39,36 @@ function toolSteps(calls: ToolCall[]) {
   }));
 }
 
-/** Plain text with paragraph breaks — never HTML (DESIGN_SYSTEM.md AgentMessage). */
+/** **bold** spans → <strong>; everything else stays text (React escapes it). */
+function inline(text: string) {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
+  part.startsWith('**') && part.endsWith('**') && part.length > 4 ?
+  <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong> :
+  part.replace(/\*\*/g, '')
+  );
+}
+
+/** Markdown-lite: paragraphs, "- " / "* " bullet lists and **bold** — never HTML (DESIGN_SYSTEM.md AgentMessage). */
 function MessageText({ text }: { text: string }) {
-  return <p className="whitespace-pre-line text-[15px] leading-relaxed">{text}</p>;
+  const blocks: React.ReactNode[] = [];
+  let bullets: string[] = [];
+  const flush = () => {
+    if (bullets.length === 0) return;
+    blocks.push(
+      <ul key={`ul-${blocks.length}`} className="list-disc space-y-0.5 pl-5">
+        {bullets.map((b, i) => <li key={i}>{inline(b)}</li>)}
+      </ul>
+    );
+    bullets = [];
+  };
+  text.split('\n').forEach((line) => {
+    const bullet = line.match(/^\s*[-*•]\s+(.*)$/);
+    if (bullet) return void bullets.push(bullet[1]);
+    flush();
+    if (line.trim()) blocks.push(<p key={`p-${blocks.length}`}>{inline(line.replace(/^#+\s*/, ''))}</p>);
+  });
+  flush();
+  return <div className="space-y-2 text-[15px] leading-relaxed">{blocks}</div>;
 }
 
 export function AIShopping() {

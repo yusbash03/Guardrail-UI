@@ -42,6 +42,11 @@ export function toReasons(reasons: PolicyReason[]): Reason[] {
   }));
 }
 
+/** Statuses the API lets the user cancel (nothing has been charged yet). */
+export function isCancellable(status: PurchaseStatus): boolean {
+  return status === 'AWAITING_APPROVAL' || status === 'READY_FOR_CHECKOUT' || status === 'CHECKOUT_PENDING';
+}
+
 /** Purchase status → the design's chip labels (Completed / Failed / Pending / Rejected / Expired …). */
 export function purchaseStatusLabel(status: PurchaseStatus): string {
   switch (status) {

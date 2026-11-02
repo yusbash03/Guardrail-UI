@@ -1,15 +1,36 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { X } from 'lucide-react';
+import { toast } from 'sonner';
+import { Button } from '../ui/Button';
 import { MerchantAvatar } from '../MerchantAvatar';
 import { MoneyText } from '../MoneyText';
 import { StatusChip } from '../StatusChip';
 import { StatusTimeline } from '../StatusTimeline';
 import { CopyId } from '../CopyId';
 import { statusStyle } from '../../utils/status';
+import { useCancelPurchase } from '../../lib/queries';
+import { errorMessage } from '../../lib/errorCopy';
 import type { Purchase } from '../../types/transaction';
 
 export function TransactionPanel({ purchase, onClose }: {purchase: Purchase | null;onClose: () => void;}) {
+  const cancel = useCancelPurchase();
+  const [confirmCancel, setConfirmCancel] = useState(false);
+
+  useEffect(() => setConfirmCancel(false), [purchase?.id]);
+
+  const cancelPurchase = () => {
+    if (!purchase) return;
+    cancel.mutate(purchase.id, {
+      onSuccess: () => {
+        setConfirmCancel(false);
+        toast('Purchase cancelled — nothing was charged');
+        onClose();
+      },
+      onError: (err) => toast.error(errorMessage(err))
+    });
+  };
+
   useEffect(() => {
     if (!purchase) return;
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -66,6 +87,25 @@ export function TransactionPanel({ purchase, onClose }: {purchase: Purchase | nu
                 </div>
               </dl>
             </div>
+            {purchase.canCancel &&
+          <div className="border-t border-border px-5 py-4">
+                {confirmCancel ?
+            <div className="rounded-btn border border-blocked/30 bg-blocked/5 p-4">
+                    <p className="text-sm">Cancel this purchase? Nothing has been charged, and the amount goes back to your budget.</p>
+                    <div className="mt-3 flex gap-2">
+                      <Button variant="secondary" size="sm" onClick={() => setConfirmCancel(false)} disabled={cancel.isPending}>Keep it</Button>
+                      <Button variant="danger" size="sm" onClick={cancelPurchase} disabled={cancel.isPending}>
+                        Cancel purchase
+                      </Button>
+                    </div>
+                  </div> :
+
+            <Button variant="secondary" className="w-full" onClick={() => setConfirmCancel(true)}>
+                    Cancel purchase
+                  </Button>
+            }
+              </div>
+          }
           </motion.aside>
         </div>
       }

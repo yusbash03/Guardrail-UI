@@ -17,7 +17,7 @@ import { buildTimeline } from '../lib/timeline';
 import type { LedgerEntryDto, TransactionDto } from '../lib/schemas';
 import { downloadCsv } from '../utils/csv';
 import { merchantAvatar } from '../utils/merchant';
-import { categoryName, humanize, paymentStatusLabel, purchaseStatusLabel } from '../utils/labels';
+import { categoryName, humanize, isCancellable, paymentStatusLabel, purchaseStatusLabel } from '../utils/labels';
 import { formatDate, formatDateTime } from '../utils/time';
 import { toAmount } from '../utils/money';
 import type { LedgerEntry, Purchase } from '../types/transaction';
@@ -60,6 +60,7 @@ function toRow(t: TransactionDto): Purchase {
     authorizationId: t.paypalAuthorizationId ?? null,
     captureId: t.paypalCaptureId ?? null,
     finalCheck: finalCheckOf(t),
+    canCancel: isCancellable(t.status),
     timeline: []
   };
 }
@@ -139,6 +140,9 @@ function useSelectedPurchase(row: Purchase | null): Purchase | null {
       captureId: p.payment?.paypalCaptureId ?? row.captureId,
       orderId: p.payment?.paypalOrderId ?? row.orderId,
       finalCheck: p.payment?.finalCheck ? p.payment.finalCheck.passed : row.finalCheck,
+      purchaseStatus: purchaseStatusLabel(p.status),
+      paymentStatus: paymentStatusLabel(p.payment?.status),
+      canCancel: isCancellable(p.status),
       timeline: buildTimeline(p, entries.data?.items ?? [])
     };
   }, [row, purchase.data, entries.data]);

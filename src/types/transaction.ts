@@ -21,6 +21,7 @@ export interface Purchase {
   authorizationId: string | null;
   captureId: string | null;
   finalCheck: boolean | null;
+  canCancel: boolean;
   timeline: TimelineStep[];
 }
 
