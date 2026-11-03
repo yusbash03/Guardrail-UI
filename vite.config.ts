@@ -1,7 +1,23 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv, type ProxyOptions } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import pkg from './package.json';
+
+// Where `npm run dev` / `npm run preview` forward /api. Local API by default; `npm run dev:render` targets Render.
+const env = loadEnv(process.env.NODE_ENV ?? 'development', process.cwd(), '');
+const apiTarget = env.API_PROXY_TARGET || 'http://localhost:5080';
+
+// The browser stays same-origin (so the httpOnly refresh cookie, Path=/api/v1/auth, round-trips). The API's refresh
+// endpoint rejects a foreign Origin (CSRF defence), so the proxy presents the target's own origin.
+const apiProxy: ProxyOptions = {
+  target: apiTarget,
+  changeOrigin: true,
+  secure: true,
+  configure: (proxy) =>
+    proxy.on('proxyReq', (req) => {
+      if (req.getHeader('origin')) req.setHeader('origin', new URL(apiTarget).origin);
+    }),
+};
 
 // PWA_REQUIREMENTS.md: precache the shell only; /api/** is never cached; PayPal is not intercepted.
 export default defineConfig({
@@ -48,10 +64,10 @@ export default defineConfig({
   ],
   server: {
     port: 5173,
-    proxy: {
-      // Same-origin in dev so the httpOnly refresh cookie (Path=/api/v1/auth) round-trips.
-      '/api': { target: 'http://localhost:5080', changeOrigin: false },
-      '/images': { target: 'http://localhost:5080', changeOrigin: false },
-    },
+    proxy: { '/api': apiProxy, '/images': apiProxy },
+  },
+  preview: {
+    port: 4173,
+    proxy: { '/api': apiProxy, '/images': apiProxy },
   },
 });

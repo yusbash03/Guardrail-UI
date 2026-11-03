@@ -6,7 +6,7 @@ The installable web app (PWA) for **Guardrail AI**, an AI shopping assistant tha
 
 Built for the PayPal AI Hackathon 2026. **PayPal Sandbox only; no real money moves.**
 
-Backend: [Guardrail_API](https://github.com/yusbash03/Guardrail_API) (ASP.NET Core, PostgreSQL).
+Backend: [Guardrail_API](https://github.com/yusbash03/Guardrail_API) (ASP.NET Core, PostgreSQL), deployed at **https://guardrail-api-bxyn.onrender.com** ([health](https://guardrail-api-bxyn.onrender.com/api/v1/health) · [Swagger](https://guardrail-api-bxyn.onrender.com/swagger)).
 
 ## What you can do
 
@@ -35,21 +35,24 @@ The AI has no tool that can approve, pay, change rules or touch the ledger.
 
 ## Run locally
 
-Requirements: Node 20+, and the [Guardrail API](https://github.com/yusbash03/Guardrail_API) running on `http://localhost:5080`.
+Requirements: Node 20+.
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173
+npm run dev:render   # http://localhost:5173, against the deployed Render API
+npm run dev          # http://localhost:5173, against a local API on http://localhost:5080
 ```
 
-The dev server proxies `/api` and `/images` to `localhost:5080`, so the browser sees one origin and the httpOnly refresh cookie works.
+The app always calls the API at the same-origin path `/api/v1`. The dev and preview servers proxy `/api` to the target, so the httpOnly refresh cookie works. The proxy also presents the target's own `Origin`, because the API's refresh endpoint rejects cross-origin requests. To run the API locally, see [Guardrail_API](https://github.com/yusbash03/Guardrail_API).
+
+The Render free tier sleeps when idle, so the first request after a while can take about a minute.
 
 | Script | |
 |---|---|
-| `npm run dev` | Dev server |
+| `npm run dev` / `npm run dev:render` | Dev server against the local API / the Render API |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run build` | Typecheck + production build, including the service worker |
-| `npm run preview` | Serve `dist/`; use this to test install and offline behaviour |
+| `npm run preview` / `npm run preview:render` | Serve `dist/` on http://localhost:4173; use this to test install and offline behaviour |
 
 Environment (see [`.env.example`](.env.example)):
 
@@ -57,6 +60,7 @@ Environment (see [`.env.example`](.env.example)):
 |---|---|---|
 | `VITE_API_BASE_URL` | `/api/v1` | Keep same-origin; Vite (dev) or Vercel (prod) forwards it to the API |
 | `VITE_PAYPAL_ENV_LABEL` | `Sandbox` | Label for the environment badge |
+| `API_PROXY_TARGET` | `http://localhost:5080` | Dev/preview proxy target only; not bundled |
 
 `VITE_*` values are public in the bundle. Never put secrets in them.
 
@@ -90,9 +94,13 @@ src/
 
 ## Deploy (Vercel)
 
-1. Set `VITE_API_BASE_URL=/api/v1`.
-2. In [`vercel.json`](vercel.json), point the `/api` rewrite at your Render API URL. The current URL is a placeholder.
-3. Set the API's `PayPal__ReturnUrl` and `PayPal__CancelUrl` to `https://<your-domain>/checkout/return` and `/checkout/cancel`.
+[`vercel.json`](vercel.json) rewrites `/api/*` to `https://guardrail-api-bxyn.onrender.com/api/*` and serves `index.html` for every other route. It also sets the CSP and security headers.
+
+1. Import the repo into Vercel. The framework is Vite, the build command is `npm run build` and the output directory is `dist`.
+2. Set `VITE_API_BASE_URL=/api/v1` (the default) and, optionally, `VITE_PAYPAL_ENV_LABEL=Sandbox`.
+3. On the **Render API**, set:
+   - `Cors__AllowedOrigins` to your Vercel URL, e.g. `https://guardrail-ui.vercel.app`. **This is required.** The rewrite forwards the browser's `Origin`, and without this setting the API rejects session refresh with 403, so users are logged out on every reload.
+   - `PayPal__ReturnUrl` to `https://<your-domain>/checkout/return` and `PayPal__CancelUrl` to `https://<your-domain>/checkout/cancel`.
 
 ## Docs
 
