@@ -45,17 +45,28 @@ export const session = {
   },
 };
 
-/** Exchanges the httpOnly refresh cookie for a new access token. Single-flight across concurrent callers. */
+const REFRESH_LOCK = 'guardrail-auth-refresh';
+
+async function postRefresh(): Promise<AuthResponse | null> {
+  const res = await fetch(`${BASE_URL}/auth/refresh`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'X-Guardrail-Client': 'web' },
+  });
+  if (!res.ok) return null;
+  return AuthResponseSchema.parse(await res.json());
+}
+
+/**
+ * Exchanges the httpOnly refresh cookie for a new access token. Single-flight within the tab, and serialised across
+ * tabs with a Web Lock: every refresh rotates the cookie, so two tabs sending the same one at once looks like token
+ * reuse. A tab that waited for the lock refreshes with the cookie the previous holder just received.
+ */
 export function refreshSession(): Promise<AuthResponse | null> {
   refreshInFlight ??= (async () => {
     try {
-      const res = await fetch(`${BASE_URL}/auth/refresh`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'X-Guardrail-Client': 'web' },
-      });
-      if (!res.ok) return null;
-      const auth = AuthResponseSchema.parse(await res.json());
+      const auth = navigator.locks ? await navigator.locks.request(REFRESH_LOCK, postRefresh) : await postRefresh();
+      if (!auth) return null;
       accessToken = auth.accessToken;
       onSessionRefreshed?.(auth);
       return auth;
