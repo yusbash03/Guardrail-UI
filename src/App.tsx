@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { lazy } from 'react';
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import { MotionConfig } from 'framer-motion';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -12,17 +12,20 @@ import { AppShell } from './components/layout/AppShell';
 import { LogoMark } from './components/Logo';
 import { Overview } from './pages/Overview';
 import { AIShopping } from './pages/AIShopping';
-import { SpendingRules } from './pages/SpendingRules';
 import { Merchants } from './pages/Merchants';
-import { Approvals } from './pages/Approvals';
-import { Transactions } from './pages/Transactions';
 import { Settings } from './pages/Settings';
-import { PolicyHistory } from './pages/PolicyHistory';
 import { CartBuilder } from './pages/CartBuilder';
 import { CheckoutReturn } from './pages/CheckoutReturn';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { isApiError } from './lib/api';
+
+// Pages with AG Grid load on demand so the shell, login and checkout stay light (AG_GRID_USAGE.md §8 bundle risk).
+const SpendingRules = lazy(() => import('./pages/SpendingRules').then((m) => ({ default: m.SpendingRules })));
+const Approvals = lazy(() => import('./pages/Approvals').then((m) => ({ default: m.Approvals })));
+const Transactions = lazy(() => import('./pages/Transactions').then((m) => ({ default: m.Transactions })));
+const Insights = lazy(() => import('./pages/Insights').then((m) => ({ default: m.Insights })));
+const PolicyHistory = lazy(() => import('./pages/PolicyHistory').then((m) => ({ default: m.PolicyHistory })));
 
 // In-memory cache only — no persister (PWA_REQUIREMENTS.md §4).
 const queryClient = new QueryClient({
@@ -90,6 +93,7 @@ export function App() {
                     <Route path="/approvals/:id" element={<Approvals />} />
                     <Route path="/transactions" element={<Transactions />} />
                     <Route path="/transactions/:purchaseId" element={<Transactions />} />
+                    <Route path="/insights" element={<Insights />} />
                     <Route path="/settings" element={<Settings />} />
                   </Route>
                 </Route>

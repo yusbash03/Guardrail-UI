@@ -13,6 +13,7 @@ import { changeSummary, toPolicyDocument, toRules } from '../lib/rulesMapping';
 import { isApiError } from '../lib/api';
 import { errorMessage } from '../lib/errorCopy';
 import { ruleSections } from '../data/rules';
+import { validateBudgets } from '../lib/budgetValidation';
 import { formatWhen } from '../utils/time';
 import type { SpendingRules as Rules } from '../types/rules';
 
@@ -59,6 +60,7 @@ export function SpendingRules() {
   const version = policy.data.versionNumber ?? 0;
   const latest = versions.data?.items[0];
   const dirty = JSON.stringify(rules) !== JSON.stringify(saved);
+  const budgetsInvalid = validateBudgets(rules.categoryBudgets).size > 0;
   const update = (patch: Partial<Rules>) => setRules((r) => r && { ...r, ...patch });
   const isEditing = (id: string) => editing.includes(id);
   const toggleEdit = (id: string) => setEditing((list) => list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
@@ -192,7 +194,7 @@ export function SpendingRules() {
                   <Button variant="ghost" size="sm" onClick={discard} disabled={savePolicy.isPending}>
                     Discard
                   </Button>
-                  <Button size="sm" onClick={save} disabled={hasConflict || savePolicy.isPending || !online}>
+                  <Button size="sm" onClick={save} disabled={hasConflict || savePolicy.isPending || !online || budgetsInvalid} title={budgetsInvalid ? 'Fix the highlighted budgets first' : undefined}>
                     {savePolicy.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
                     Save changes
                   </Button>

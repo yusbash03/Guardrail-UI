@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { WifiOff } from 'lucide-react';
 import { Sidebar } from './Sidebar';
@@ -6,6 +6,7 @@ import { TopBar } from './TopBar';
 import { MobileTabBar } from './MobileTabBar';
 import { pageTitles } from '../../data/navigation';
 import { useOnline } from '../../hooks/useOnline';
+import { PageLoading } from '../PageState';
 
 function titleFor(pathname: string) {
   if (pageTitles[pathname]) return pageTitles[pathname];
@@ -28,7 +29,7 @@ export function AppShell() {
           </div>
         }
         <main id="main" className="min-h-0 flex-1 overflow-y-auto pb-16 lg:pb-0">
-          {online ? <Outlet /> : <OfflineContent />}
+          {online ? <Suspense fallback={<PageLoading label="Loading page" />}><Outlet /></Suspense> : <OfflineContent />}
         </main>
       </div>
       <MobileTabBar />

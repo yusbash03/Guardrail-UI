@@ -47,11 +47,19 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // AG Studio (Insights) is ~5.7 MB: keep it out of the precached shell; it's cached on first use (below).
+        globIgnores: ['**/Insights-*.js'],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//],
         cleanupOutdatedCaches: true,
         runtimeCaching: [
           { urlPattern: ({ url }) => url.pathname.startsWith('/api/'), handler: 'NetworkOnly' },
+          {
+            // Hashed, immutable code (no data): safe to cache after the first visit to Insights.
+            urlPattern: ({ url }) => /^\/assets\/Insights-[\w-]+\.js$/.test(url.pathname),
+            handler: 'CacheFirst',
+            options: { cacheName: 'insights-code', expiration: { maxEntries: 2 } },
+          },
           {
             urlPattern: ({ url }) => url.pathname.startsWith('/images/'),
             handler: 'StaleWhileRevalidate',

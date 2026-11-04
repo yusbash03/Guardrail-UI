@@ -1,9 +1,10 @@
 import React from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { RuleSection, RuleSectionsProps } from './RuleSection';
 import { Button } from '../ui/Button';
 import { MoneyInput } from '../ui/MoneyInput';
-import { Select } from '../ui/Select';
+import { BudgetsGrid } from './BudgetsGrid';
+import { validateBudgets } from '../../lib/budgetValidation';
 import { formatMoney } from '../../utils/money';
 import type { CategoryBudget } from '../../types/rules';
 
@@ -17,7 +18,7 @@ export function LimitSections({ rules, update, isEditing, toggleEdit, categories
   const setBudget = (id: string, patch: Partial<CategoryBudget>) =>
   update({ categoryBudgets: rules.categoryBudgets.map((b) => b.id === id ? { ...b, ...patch } : b) });
 
-  const nameOf = (code: string) => categories.find((c) => c.code === code)?.name ?? code;
+  const budgetErrors = validateBudgets(rules.categoryBudgets);
 
   const addBudget = () => {
     const used = new Set(rules.categoryBudgets.map((b) => b.categoryCode));
@@ -30,64 +31,19 @@ export function LimitSections({ rules, update, isEditing, toggleEdit, categories
   return (
     <>
       <RuleSection id="budgets" title="Category budgets" description="How much the assistant can spend per category." editing={editBudgets} onToggleEdit={() => toggleEdit('budgets')}>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border text-left text-xs text-muted-foreground">
-              <th scope="col" className="pb-2 font-medium">Category</th>
-              <th scope="col" className="pb-2 font-medium">Period</th>
-              <th scope="col" className="pb-2 text-right font-medium">Limit</th>
-              {editBudgets && <th scope="col" className="w-10 pb-2"><span className="sr-only">Remove</span></th>}
-            </tr>
-          </thead>
-          <tbody>
-            {rules.categoryBudgets.map((b) =>
-            <tr key={b.id} className="border-b border-border last:border-0">
-                <td className="py-2.5 pr-3">
-                  {editBudgets ?
-                <Select
-                  aria-label="Category"
-                  options={categories.map((c) => c.name)}
-                  value={b.category}
-                  onChange={(e) => {
-                    const category = categories.find((c) => c.name === e.target.value);
-                    if (category) setBudget(b.id, { categoryCode: category.code, category: category.name });
-                  }}
-                  className="w-full max-w-[180px]" /> :
-
-
-                <span className="font-medium">{nameOf(b.categoryCode)}</span>
-                }
-                </td>
-                <td className="py-2.5 pr-3">
-                  {editBudgets ?
-                <Select aria-label="Period" options={['Weekly', 'Monthly']} value={b.period} onChange={(e) => setBudget(b.id, { period: e.target.value as CategoryBudget['period'] })} /> :
-
-                <span className="text-muted-foreground">{b.period}</span>
-                }
-                </td>
-                <td className="py-2.5 text-right">
-                  {editBudgets ?
-                <MoneyInput label={`${b.category} limit`} value={b.limit} onChange={(v) => setBudget(b.id, { limit: v })} className="ml-auto" /> :
-
-                <span className="tabular font-semibold">{formatMoney(b.limit)}</span>
-                }
-                </td>
-                {editBudgets &&
-              <td className="py-2.5 pl-2 text-right">
-                    <button
-                  type="button"
-                  aria-label={`Remove ${b.category}`}
-                  onClick={() => update({ categoryBudgets: rules.categoryBudgets.filter((x) => x.id !== b.id) })}
-                  className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-blocked-fg">
-                  
-                      <Trash2 className="h-4 w-4" aria-hidden="true" />
-                    </button>
-                  </td>
-              }
-              </tr>
-            )}
-          </tbody>
-        </table>
+        <BudgetsGrid
+          budgets={rules.categoryBudgets}
+          categories={categories}
+          editing={editBudgets}
+          errors={budgetErrors}
+          onChange={setBudget}
+          onRemove={(id) => update({ categoryBudgets: rules.categoryBudgets.filter((x) => x.id !== id) })} />
+        {editBudgets && budgetErrors.size > 0 &&
+        <p role="alert" className="mt-2 text-sm font-medium text-blocked-fg">
+            {[...budgetErrors.values()].map((e) => e.category ?? e.limit).filter(Boolean)[0]} — fix the highlighted cells to save.
+          </p>
+        }
+        {editBudgets && <p className="mt-2 text-xs text-muted-foreground">Click a cell to edit it. Changes are saved together with Save changes.</p>}
         <Button variant="ghost" size="sm" className="mt-3 -ml-2 text-primary-ink" onClick={addBudget}>
           <Plus className="h-4 w-4" aria-hidden="true" /> Add budget
         </Button>

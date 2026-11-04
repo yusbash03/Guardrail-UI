@@ -33,6 +33,7 @@ export function PolicyHistory() {
   {
     key: 'select',
     header: 'Compare',
+    width: 100,
     className: 'w-20',
     render: (v) =>
     <input
@@ -44,9 +45,9 @@ export function PolicyHistory() {
       className="h-4 w-4 accent-[hsl(var(--primary))]" />
 
   },
-  { key: 'version', header: 'Version', render: (v) => <span className="tabular font-semibold">Version {v.versionNumber}</span> },
-  { key: 'summary', header: 'Change', className: 'whitespace-normal', render: (v) => v.changeSummary },
-  { key: 'created', header: 'Created', render: (v) => <span className="tabular text-muted-foreground">{formatDateTime(v.createdAt)}</span> },
+  { key: 'version', header: 'Version', width: 130, value: (v) => v.versionNumber, render: (v) => <span className="tabular font-semibold">Version {v.versionNumber}</span> },
+  { key: 'summary', header: 'Change', flex: 2, value: (v) => v.changeSummary, render: (v) => v.changeSummary },
+  { key: 'created', header: 'Created', value: (v) => v.createdAt, render: (v) => <span className="tabular text-muted-foreground">{formatDateTime(v.createdAt)}</span> },
   { key: 'hash', header: 'Snapshot hash', render: (v) => <span className="font-mono text-xs text-muted-foreground">{v.snapshotHash.slice(0, 12)}</span> }];
 
 

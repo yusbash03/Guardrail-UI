@@ -1,12 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Check, Download, X } from 'lucide-react';
+import { Check, Download, Search, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Select } from '../components/ui/Select';
 import { SegmentedTabs } from '../components/ui/SegmentedTabs';
-import { DataGrid, Column, SortState } from '../components/DataGrid';
+import { DataGrid, Column, RowTone, SortState } from '../components/DataGrid';
 import { MerchantAvatar } from '../components/MerchantAvatar';
 import { MoneyText } from '../components/MoneyText';
 import { StatusChip } from '../components/StatusChip';
@@ -66,6 +66,15 @@ function toRow(t: TransactionDto): Purchase {
   };
 }
 
+const PENDING_LABELS = new Set(['Pending', 'Awaiting approval', 'Ready to pay']);
+
+/** Failed/voided purchases tinted red, in-flight ones grey (AG_GRID_USAGE.md §4). */
+const purchaseTone = (r: Purchase): RowTone =>
+r.purchaseStatus === 'Failed' || r.paymentStatus === 'Voided' ? 'negative' : PENDING_LABELS.has(r.purchaseStatus) ? 'muted' : undefined;
+
+const ledgerTone = (r: LedgerEntry): RowTone =>
+r.transition === 'VOID' || r.transition === 'FAIL' ? 'negative' : r.transition === 'PROPOSE' || r.transition === 'RESERVE' ? 'muted' : undefined;
+
 /** Row for a deep-linked purchase that isn't on the current page. */
 function rowFromPurchase(p: PurchaseDto): Purchase {
   return {
@@ -87,25 +96,28 @@ function rowFromPurchase(p: PurchaseDto): Purchase {
 }
 
 const purchaseColumns: Column<Purchase>[] = [
-{ key: 'date', header: 'Date', sortField: 'createdAt', render: (r) => <span className="text-muted-foreground">{r.date}</span> },
+{ key: 'date', header: 'Date', sortField: 'createdAt', width: 110, value: (r) => r.date, render: (r) => <span className="text-muted-foreground">{r.date}</span> },
 {
   key: 'merchant',
   header: 'Merchant',
+  minWidth: 180,
+  value: (r) => r.merchant,
   render: (r) =>
   <span className="flex items-center gap-2 font-medium">
         <MerchantAvatar initials={r.initials} hue={r.hue} size="sm" /> {r.merchant}
       </span>
 
 },
-{ key: 'amount', header: 'Amount', align: 'right', sortField: 'amount', render: (r) => <MoneyText amount={r.amount} /> },
-{ key: 'ps', header: 'Purchase status', sortField: 'status', render: (r) => <StatusChip label={r.purchaseStatus} /> },
-{ key: 'pay', header: 'Payment status', render: (r) => r.paymentStatus === '—' ? <span className="text-muted-foreground">—</span> : <StatusChip label={r.paymentStatus} /> },
-{ key: 'order', header: 'PayPal order ID', render: (r) => r.orderId ? <CopyId value={r.orderId} label="PayPal order ID" /> : <span className="text-muted-foreground">—</span> },
-{ key: 'auth', header: 'Authorization ID', render: (r) => <span className="font-mono text-xs text-muted-foreground">{r.authorizationId ?? '—'}</span> },
-{ key: 'cap', header: 'Capture ID', render: (r) => <span className="font-mono text-xs text-muted-foreground">{r.captureId ?? '—'}</span> },
+{ key: 'amount', header: 'Amount', align: 'right', sortField: 'amount', width: 120, value: (r) => r.amount.toFixed(2), render: (r) => <MoneyText amount={r.amount} /> },
+{ key: 'ps', header: 'Purchase status', sortField: 'status', minWidth: 150, value: (r) => r.purchaseStatus, render: (r) => <StatusChip label={r.purchaseStatus} /> },
+{ key: 'pay', header: 'Payment status', minWidth: 140, value: (r) => r.paymentStatus, render: (r) => r.paymentStatus === '—' ? <span className="text-muted-foreground">—</span> : <StatusChip label={r.paymentStatus} /> },
+{ key: 'order', header: 'PayPal order ID', minWidth: 200, value: (r) => r.orderId, render: (r) => r.orderId ? <CopyId value={r.orderId} label="PayPal order ID" /> : <span className="text-muted-foreground">—</span> },
+{ key: 'auth', header: 'Authorization ID', minWidth: 170, value: (r) => r.authorizationId, render: (r) => <span className="font-mono text-xs text-muted-foreground">{r.authorizationId ?? '—'}</span> },
+{ key: 'cap', header: 'Capture ID', minWidth: 170, value: (r) => r.captureId, render: (r) => <span className="font-mono text-xs text-muted-foreground">{r.captureId ?? '—'}</span> },
 {
   key: 'final',
   header: 'Final check',
+  width: 110,
   align: 'center',
   render: (r) =>
   r.finalCheck === null ?
@@ -119,20 +131,22 @@ const purchaseColumns: Column<Purchase>[] = [
 
 
 const ledgerColumns: Column<LedgerEntry>[] = [
-{ key: 'time', header: 'Time', render: (r) => <span className="tabular text-muted-foreground">{r.time}</span> },
-{ key: 'transition', header: 'Transition', render: (r) => <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[11px] font-medium">{r.transition}</span> },
+{ key: 'time', header: 'Time', minWidth: 170, value: (r) => r.time, render: (r) => <span className="tabular text-muted-foreground">{r.time}</span> },
+{ key: 'transition', header: 'Transition', minWidth: 170, value: (r) => r.transition, render: (r) => <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[11px] font-medium">{r.transition}</span> },
 {
   key: 'bucket',
   header: 'From → To bucket',
+  minWidth: 200,
+  value: (r) => `${r.from} → ${r.to}`,
   render: (r) =>
   <span className="text-sm">
         <span className="text-muted-foreground">{r.from}</span> → <span className="font-medium">{r.to}</span>
       </span>
 
 },
-{ key: 'category', header: 'Category', render: (r) => r.category },
-{ key: 'amount', header: 'Amount', align: 'right', render: (r) => <MoneyText amount={r.amount} /> },
-{ key: 'source', header: 'Source', render: (r) => <span className="text-muted-foreground">{r.source}</span> }];
+{ key: 'category', header: 'Category', value: (r) => r.category, render: (r) => r.category },
+{ key: 'amount', header: 'Amount', align: 'right', width: 120, value: (r) => r.amount, render: (r) => <MoneyText amount={r.amount} /> },
+{ key: 'source', header: 'Source', value: (r) => r.source, render: (r) => <span className="text-muted-foreground">{r.source}</span> }];
 
 
 function Pager({ page, total, onChange }: {page: number;total: number;onChange: (page: number) => void;}) {
@@ -179,6 +193,7 @@ export function Transactions() {
   const [range, setRange] = useState<(typeof rangeOptions)[number]>('Last 30 days');
   const [page, setPage] = useState(1);
   const [ledgerPage, setLedgerPage] = useState(1);
+  const [search, setSearch] = useState('');
   const categories = useCategories();
 
   const from = useMemo(() => {
@@ -235,6 +250,17 @@ export function Transactions() {
           } />
         
         <div className="flex flex-wrap items-center gap-2">
+          <div className="relative hidden md:block">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+            <input
+              type="search"
+              aria-label={`Search ${tab}`}
+              placeholder="Search this page…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-9 w-56 rounded-btn border border-border bg-card pl-9 pr-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" />
+            
+          </div>
           {tab === 'purchases' &&
           <Select
             aria-label="Filter by status"
@@ -273,6 +299,10 @@ export function Transactions() {
             getRowId={(r) => r.id}
             onRowClick={open}
             selectedId={purchaseId}
+            quickFilter={search}
+            rowTone={purchaseTone}
+            layoutKey="transactions-purchases"
+            loading={transactions.isFetching && !transactions.isLoading}
             sort={sort}
             onSortChange={(next) => {
               setSort(next);
@@ -306,7 +336,16 @@ export function Transactions() {
 
       <>
           <div className="hidden md:block">
-            <DataGrid ariaLabel="Ledger" columns={ledgerColumns} rows={ledgerRows} getRowId={(r) => r.id} emptyLabel={ledger.isLoading ? 'Loading…' : 'No ledger entries in this range.'} />
+            <DataGrid
+            ariaLabel="Ledger"
+            columns={ledgerColumns}
+            rows={ledgerRows}
+            getRowId={(r) => r.id}
+            quickFilter={search}
+            rowTone={ledgerTone}
+            layoutKey="transactions-ledger"
+            emptyLabel={ledger.isLoading ? 'Loading…' : 'No ledger entries in this range.'} />
+            
           </div>
           <ul className="space-y-3 md:hidden">
             {ledgerRows.map((r) =>

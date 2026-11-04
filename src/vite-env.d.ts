@@ -7,4 +7,5 @@ declare const __BUILD_DATE__: string;
 interface ImportMetaEnv {
   readonly VITE_API_BASE_URL?: string;
   readonly VITE_PAYPAL_ENV_LABEL?: string;
+  readonly VITE_AG_STUDIO_LICENSE_KEY?: string;
 }

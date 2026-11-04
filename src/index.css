@@ -93,3 +93,42 @@ input[type='range'] {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* AG Grid (components/DataGrid.tsx): cells hold the design's chips/avatars, so centre them vertically. */
+.gr-grid .gr-cell {
+  display: flex;
+  align-items: center;
+  font-variant-numeric: tabular-nums;
+}
+.gr-grid .gr-cell-right {
+  justify-content: flex-end;
+}
+.gr-grid .gr-cell-center {
+  justify-content: center;
+}
+.gr-grid .gr-header-center .ag-header-cell-label {
+  justify-content: center;
+}
+.gr-grid .gr-row-clickable {
+  cursor: pointer;
+}
+.gr-grid .gr-row-negative {
+  background-color: hsl(var(--blocked) / 0.05);
+}
+.gr-grid .gr-row-muted {
+  color: hsl(var(--muted-foreground));
+}
+.gr-grid .gr-row-selected {
+  background-color: hsl(var(--primary) / 0.06);
+}
+.gr-grid .gr-grid-empty {
+  color: hsl(var(--muted-foreground));
+  font-size: 14px;
+}
+.gr-grid .ag-cell-inline-editing {
+  border-radius: 10px;
+}
+.gr-grid .gr-cell-invalid {
+  box-shadow: inset 0 0 0 2px hsl(var(--blocked) / 0.7);
+  border-radius: 6px;
+}

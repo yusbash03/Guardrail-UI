@@ -27,20 +27,22 @@ import type { ApprovalHistoryRow } from '../types/transaction';
 type Tab = 'pending' | 'history';
 
 const columns: Column<ApprovalHistoryRow>[] = [
-{ key: 'date', header: 'Date', render: (r) => <span className="text-muted-foreground">{r.date}</span> },
+{ key: 'date', header: 'Date', value: (r) => r.date, render: (r) => <span className="text-muted-foreground">{r.date}</span> },
 {
   key: 'merchant',
   header: 'Merchant',
+  minWidth: 180,
+  value: (r) => r.merchant,
   render: (r) =>
   <span className="flex items-center gap-2 font-medium">
         <MerchantAvatar initials={r.initials} hue={r.hue} size="sm" /> {r.merchant}
       </span>
 
 },
-{ key: 'amount', header: 'Amount', align: 'right', render: (r) => <MoneyText amount={r.amount} /> },
-{ key: 'decision', header: 'Decision', render: () => <DecisionBadge decision="REQUIRES_APPROVAL" /> },
-{ key: 'status', header: 'Status', render: (r) => <StatusChip label={r.status} /> },
-{ key: 'by', header: 'Requested by', render: (r) => <span className="text-muted-foreground">{r.requestedBy}</span> }];
+{ key: 'amount', header: 'Amount', align: 'right', value: (r) => r.amount, render: (r) => <MoneyText amount={r.amount} /> },
+{ key: 'decision', header: 'Decision', minWidth: 190, render: () => <DecisionBadge decision="REQUIRES_APPROVAL" /> },
+{ key: 'status', header: 'Status', value: (r) => r.status, render: (r) => <StatusChip label={r.status} /> },
+{ key: 'by', header: 'Requested by', value: (r) => r.requestedBy, render: (r) => <span className="text-muted-foreground">{r.requestedBy}</span> }];
 
 
 const shortReasons: Record<string, string> = {
@@ -193,7 +195,7 @@ export function Approvals() {
                 <p className="mt-1 text-sm text-muted-foreground">When a cart needs your OK, it shows up here.</p>
               </Card>)
         }
-          {tab === 'history' && <DataGrid ariaLabel="Approval history" columns={columns} rows={history} getRowId={(r) => r.id} emptyLabel={all.isLoading ? 'Loading…' : 'No decided approvals yet.'} />}
+          {tab === 'history' && <DataGrid ariaLabel="Approval history" columns={columns} rows={history} getRowId={(r) => r.id} layoutKey="approvals-history" rowTone={(r) => (r.status === 'Rejected' || r.status === 'Invalidated' ? 'negative' : r.status === 'Expired' ? 'muted' : undefined)} emptyLabel={all.isLoading ? 'Loading…' : 'No decided approvals yet.'} />}
         </>
       }
       <StepUpDialog approval={stepUp} onClose={() => setStepUp(null)} onConfirmed={handleConfirmed} />

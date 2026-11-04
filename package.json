@@ -13,6 +13,10 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.105.1",
+    "ag-grid-community": "^36.3.0",
+    "ag-grid-react": "^36.3.0",
+    "ag-studio": "^3.1.0",
+    "ag-studio-react": "^3.1.0",
     "date-fns": "^4.1.0",
     "framer-motion": "^11.18.2",
     "lucide-react": "^0.577.0",
